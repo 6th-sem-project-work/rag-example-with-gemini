@@ -1,5 +1,6 @@
 import enum
 import pydantic
+from typing import List
 
 class MessageRole(str, enum.Enum):
     user = "user"
@@ -10,5 +11,10 @@ class Message(pydantic.BaseModel):
     role: MessageRole
     content: str
 
+class MessageListItem(pydantic.BaseModel):
+    role: MessageRole
+    content: str
+
 class Query(pydantic.BaseModel):
     question: str
+    history: List[MessageListItem]

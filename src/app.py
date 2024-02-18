@@ -14,7 +14,7 @@ def push_mesg(mesg):
 
 if "client_id" not in st.session_state:
   id = str(uuid.uuid1())
-  id = "40er7db9-cb5d-10eu-brd5-74977959arrf"
+  # id = "40er7db9-cb5d-10eu-brd5-74977959arrf"
   st.session_state.client_id = id
 
 client_id = st.session_state.client_id
@@ -40,8 +40,15 @@ if prompt := st.chat_input("Message..."):
 
   push_mesg({"role": MessageRole.user, "content": prompt})
   
+  response = requests.post(
+    url=f"{BASE_URL}/chat/get",
+    data=json.dumps({
+      "question": prompt,
+      "history": st.session_state.messages[:-1]}
+    )
+  )
+  response = response.json()["response"]
 
-  response = requests.post(url=f"{BASE_URL}/chat/get", data=json.dumps({"question": prompt})).json()["response"]
   with st.chat_message("assistant"):
     st.markdown(response)
 

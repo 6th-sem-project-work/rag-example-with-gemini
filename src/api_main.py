@@ -20,7 +20,7 @@ def get_message_history(client_id: str):
 @app.post("/chat/get")
 def get_chat_response(query: Query):
     qaobject = qa.QAResponse()
-    response = qaobject.get_response(query=query.question)
+    response = qaobject.get_response(question=query.question, history=query.history)
     return {"user": query.question, "response": response}
 
 @app.post("/mesg_history/push/")

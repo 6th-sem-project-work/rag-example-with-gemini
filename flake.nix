@@ -54,7 +54,8 @@
           source ./.venv/bin/activate
           # pip install -r ./requirements.txt
 
-          uvicorn src.api_main:app --reload --reload-dir ./src
+          cd src
+          uvicorn api_main:app --reload
         '';
       };
 

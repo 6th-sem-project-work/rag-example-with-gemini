@@ -33,13 +33,21 @@
           source .env
         '';
       };
+      pip-install = pkgs.buildFHSEnv {
+        name = "pip-install";
+        targetPkgs = packages;
+        runScript = ''
+          #!/usr/bin/env bash
+          source ./.venv/bin/activate
+          pip install -r ./requirements.txt
+        '';
+      };
       chatmed-serve = pkgs.buildFHSEnv {
         name = "chatmed-serve";
         targetPkgs = packages;
         runScript = ''
           #!/usr/bin/env bash
           source ./.venv/bin/activate
-          # pip install -r ./requirements.txt
 
           ${pkgs.redis}/bin/redis-server &
           api-serve &
@@ -52,7 +60,6 @@
         runScript = ''
           #!/usr/bin/env bash
           source ./.venv/bin/activate
-          # pip install -r ./requirements.txt
 
           cd src
           uvicorn api_main:app --reload
@@ -60,6 +67,7 @@
       };
 
       custom-commands = [
+        pip-install
         api-serve
         chatmed-serve
       ];

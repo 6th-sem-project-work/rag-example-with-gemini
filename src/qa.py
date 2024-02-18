@@ -17,7 +17,6 @@ class QAResponse:
       pass
 
 
-
    def get_custom_prompt(self):
       prompt_template = """
       As an advanced and reliable medical chatbot, your foremost priority is to furnish the user with precise, evidence-based health insights and guidance. It is of utmost importance that you strictly adhere to the context provided, without introducing assumptions or extrapolations beyond the given information. Your responses must be deeply rooted in verified medical knowledge and practices. Additionally, you are to underscore the necessity for users to seek direct consultation from healthcare professionals for personalized advice.
@@ -43,7 +42,7 @@ class QAResponse:
 
 
    def retrival_qa_chain(self):
-      prompt=get_custom_prompt()
+      prompt = self.get_custom_prompt()
       embeddings = GoogleGenerativeAIEmbeddings(model='models/embedding-001')
       db = FAISS.load_local(get_absolute_path("vectorstore/db_faiss"), embeddings)
       llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.5,convert_system_message_to_human=True)
@@ -57,9 +56,8 @@ class QAResponse:
       return qa_chain
 
 
-
    def get_response(self, query):
-      bot = retrival_qa_chain()
+      bot = self.retrival_qa_chain()
       response = bot.invoke(query)
       print(response)
       return response["result"]

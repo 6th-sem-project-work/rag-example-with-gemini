@@ -3,6 +3,10 @@ from qa import get_response
 import uuid
 import redis
 import json
+import requests
+from classes import Message, MessageRole
+
+BASE_URL = "http://localhost:8000"
 
 @st.cache_resource
 def redis_client():
@@ -10,7 +14,13 @@ def redis_client():
 
 def push_mesg(mesg):
   st.session_state.messages.append(mesg)
-  rc.rpush(f"{client_id}:history", json.dumps(mesg))
+  # rc.rpush(f"{client_id}:history", json.dumps(mesg))
+  # r = MessageRole.mesg.role if mesg.role.lower() == "assistant" else "user" 
+  msg = Message(role=mesg.role.value, message=mesg.content, client_id=client_id)
+  print(msg.json())
+
+  requests.post(url=f"{BASE_URL}/msg_history/push/", data=msg.json())
+  
 
 rc = redis_client()
 
@@ -41,11 +51,15 @@ if prompt := st.chat_input("Message..."):
   with st.chat_message("user"):
     st.markdown(prompt)
 
-  push_mesg({"role": "user", "content": prompt})
+  push_mesg({"role": MessageRole.user, "content": prompt})
+  
 
-  response = get_response(prompt)
-
+  # response = get_response(prompt)
+  response = requests.get(url=f"{BASE_URL}/response", data=json.dumps(prompt))
   with st.chat_message("assistant"):
     st.markdown(response)
 
-  push_mesg({"role": "assistant", "content": response})
+  push_mesg({"role": MessageRole.assistant, "content": response})
+  # mesg = Message(role=MessageRole.assistant, message=response, client_id=client_id)
+
+  # requests.post(url=f"{BASE_URL}/mesg_history/push/", data=mesg.json())

@@ -1,19 +1,11 @@
 from fastapi import FastAPI
 import redis
 import json
+from classes import Message, MessageRole
 
 rc = redis.Redis(host="localhost", port=6379, decode_responses=True)
 app = FastAPI()
 
-class MessageRole(str, enum.Enum):
-    user = "user"
-    assistant = "assistant"
-
-
-class Message(pydantic.BaseModel):
-    client_id: str
-    role: MessageRole
-    message: str
 
 @app.get("/mesg_history/get/{client_id}")
 def get_message_history(client_id: str):

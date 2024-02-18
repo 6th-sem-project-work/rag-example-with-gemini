@@ -26,7 +26,7 @@
 
       fhs = pkgs.buildFHSEnv {
         name = "fhs-shell";
-        targetPkgs = p: (packages p) ++ [chatmed-serve];
+        targetPkgs = p: (packages p) ++ custom-commands;
         runScript = "${pkgs.zsh}/bin/zsh";
         profile = ''
           source ./.venv/bin/activate
@@ -40,9 +40,28 @@
           #!/usr/bin/env bash
           source ./.venv/bin/activate
           # pip install -r ./requirements.txt
+
+          ${pkgs.redis}/bin/redis-server &
+          api-serve &
           streamlit run ./src/app.py
         '';
       };
+      api-serve = pkgs.buildFHSEnv {
+        name = "api-serve";
+        targetPkgs = packages;
+        runScript = ''
+          #!/usr/bin/env bash
+          source ./.venv/bin/activate
+          # pip install -r ./requirements.txt
+
+          uvicorn src.api_main:app --reload --reload-dir ./src
+        '';
+      };
+
+      custom-commands = [
+        api-serve
+        chatmed-serve
+      ];
 
       packages = pkgs: (with pkgs; [
         (pkgs.python310.withPackages (ps:
@@ -65,7 +84,7 @@
       ]);
     in {
       devShells.default = pkgs.mkShell {
-        nativeBuildInputs = [fhs chatmed-serve] ++ packages pkgs;
+        nativeBuildInputs = [fhs] ++ custom-commands ++ packages pkgs;
         shellHook = ''
           source .env
         '';

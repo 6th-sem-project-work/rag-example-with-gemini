@@ -47,6 +47,7 @@ if prompt := st.chat_input("Message..."):
       "history": st.session_state.messages[:-1]}
     )
   )
+  print(response)
   response = response.json()["response"]
 
   with st.chat_message("assistant"):

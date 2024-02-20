@@ -19,9 +19,15 @@ from langchain_core.runnables import (
 from typing import List
 import pprint
 from classes import MessageRole, MessageListItem, Message
+from langchain.globals import set_debug
+
+set_debug(True)
+
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+
 
 
 def print_prompt(x):

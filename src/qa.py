@@ -79,6 +79,7 @@ class QAResponse:
             model="gemini-pro", temperature=0.5, convert_system_message_to_human=True
         )
 
+        # TODO: incremental summary
         contextualize_q_system_prompt = """"""
         contextualize_q_prompt = ChatPromptTemplate.from_messages(
             [
@@ -105,14 +106,23 @@ class QAResponse:
         return (
             RunnableParallel(
                 question=lambda x: x["question"],
-                context=lambda x: db.as_retriever().invoke(x["question"]),
+                # context=lambda x: db.as_retriever().invoke(x["question"]),
                 summary=get_summary,
             )
-            | prompt
+            | RunnableParallel(
+                question= lambda x: x['question'],
+                summary= lambda x: x['summary'],
+                context=lambda x: db.as_retriever().invoke(x['summary'] + x['question']),
+            )
+            | RunnableParallel(
+                llm_inputs=prompt,
+                context=lambda x: x['context'],
+            )
+            | RunnableParallel(
+                response=lambda x: (llm | StrOutputParser()).invoke(x["llm_inputs"]),
+                context=lambda x: x['context'],
+            )
             | printer
-            | llm
-            | printer
-            | StrOutputParser()
         )
 
     def get_response(self, question, history: List[MessageListItem] = []):

@@ -44,7 +44,7 @@ def retrival_qa_chain():
    prompt=get_custom_prompt()
    embeddings = GoogleGenerativeAIEmbeddings(model='models/embedding-001')
    db = FAISS.load_local(get_absolute_path("vectorstore/db_faiss"), embeddings)
-   llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.5,convert_system_message_to_human=True)
+   llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.1,convert_system_message_to_human=True)
    qa_chain = RetrievalQA.from_chain_type(
       llm=llm,
       chain_type='stuff',
@@ -59,5 +59,4 @@ def retrival_qa_chain():
 def get_response(query):
    bot = retrival_qa_chain()
    response = bot.invoke(query)
-   print(response)
    return response

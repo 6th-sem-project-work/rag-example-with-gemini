@@ -59,4 +59,5 @@ def retrival_qa_chain():
 def get_response(query):
    bot = retrival_qa_chain()
    response = bot.invoke(query)
-   return response["result"]
+   print(response)
+   return response

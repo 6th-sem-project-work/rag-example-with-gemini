@@ -1,5 +1,6 @@
 {
     "devCommand": "python src/app.py",
+    "version": 2,
     "builds": [
       {
         "src": "src/app.py",
@@ -12,5 +13,5 @@
         "dest": "src/app.py"
       }
     ],
-    "config": {  "runtime": "python3.10" }
+    "config": {  "runtime": "python3.9" }
   }

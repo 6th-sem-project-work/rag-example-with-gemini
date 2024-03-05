@@ -13,5 +13,4 @@
         "dest": "src/app.py"
       }
     ],
-    "config": {  "runtime": "python3.9" }
   }

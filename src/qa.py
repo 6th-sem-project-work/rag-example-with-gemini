@@ -18,123 +18,141 @@ from langchain_core.runnables import (
 )
 from typing import List
 import pprint
-from classes import MessageRole, MessageListItem, Message
+from classes import MessageRole, MessageListItem, Message, Model
 from langchain.globals import set_debug
+from langchain_community.llms import Ollama
 
-set_debug(True)
-
+# set_debug(True)
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+chatbot_with_history_prompt = """
+Summary: {summary}
 
+Context: {context}
 
+Question: {question}
 
-def print_prompt(x):
+System: provided the summary, context and a question, answer it using the given context. you may offer medical advice. do not deviate from the given context. when context is not related to the question, just say that the context does not have the answer to the question.
+"""
+chatbot_with_history_promt_template = PromptTemplate(
+    template=chatbot_with_history_prompt, input_variables=["context", "question", "summary"]
+)
+
+chatbot_prompt = '''
+Context: {context}
+
+Question: {question}
+
+System: provided the context and a question, answer it using the given context. you may offer medical advice. do not deviate from the given context. when context is not related to the question, just say that the context does not have the answer to the question.
+'''
+chatbot_promt_template = PromptTemplate(
+    template=chatbot_prompt, input_variables=["context", "question"]
+)
+
+summarization_prompt_template = ChatPromptTemplate.from_messages(
+    [
+        MessagesPlaceholder(variable_name="history"),
+        SystemMessage(
+            content="Summarise the previous chat. include as much detail as much details in fewest words possible such that it is easy for LLMs to understand and use for context."
+        ),
+    ]
+)
+
+question_rephrase_prompt = """
+Summary: {summary}
+
+Question: {question}
+
+System: given a summary of chat between an assistant and a person, rephrase the question with any context that might make sense to include. make the question self sufficient such that it is possible to answer it without providing any more context. Note: write the question as if it was written by the user and nothing else in the output.
+
+Example Question: i am having a headache. what should i do?
+
+Question: 
+"""
+question_rephrase_prompt_template = PromptTemplate(
+    template=question_rephrase_prompt, input_variables=["summary", "question"]
+)
+
+def printer_print(x):
     print()
-    # pprint.pprint(x)
-    print(x)
+    pprint.pprint(x)
     print()
     return x
+printer = RunnableLambda(printer_print)
 
 
-class QAResponse:
+class QaService:
     def __init__(self):
-        # document why this method is empty
-        pass
-
-    def get_custom_prompt(self):
-        prompt_template = """
-      As an advanced and reliable medical chatbot, your foremost priority is to furnish the user with precise, evidence-based health insights and guidance. It is of utmost importance that you strictly adhere to the context provided, without introducing assumptions or extrapolations beyond the given information. Your responses must be deeply rooted in verified medical knowledge and practices. Additionally, you are to underscore the necessity for users to seek direct consultation from healthcare professionals for personalized advice.
-
-      In crafting your response, it is crucial to:
-      - Confine your analysis and advice strictly within the parameters of the context provided by the user. Do not deviate or infer details not explicitly mentioned.
-      - Identify the key medical facts or principles pertinent to the user's inquiry, applying them directly to the specifics of the provided context.
-      - Offer general health information or clarifications that directly respond to the user's concerns, based solely on the context.
-      - Discuss recognized medical guidelines or treatment options relevant to the question, always within the scope of general advice and clearly bounded by the context given.
-      - Emphasize the critical importance of professional medical consultation for diagnoses or treatment plans, urging the user to consult a healthcare provider.
-      - Where applicable, provide actionable health tips or preventive measures that are directly applicable to the context and analysis provided, clarifying these are not substitutes for professional advice.
-
-      Your aim is to deliver a response that is not only informative and specific to the user's question but also responsibly framed within the limitations of non-personalized medical advice. Ensure accuracy, clarity, and a strong directive for the user to seek out professional medical evaluation and consultation. Through this approach, you will assist in enhancing the user's health literacy and decision-making capabilities, always within the context provided and without overstepping the boundaries of general medical guidance.
-
-      Summary: {summary}
-      
-      Context: {context}
-      
-      Question: {question}
-
-      """
-        prompt = PromptTemplate(
-            template=prompt_template, input_variables=["context", "question", "summary"]
-        )
-        return prompt
-
-    def retrival_qa_chain(self):
-        printer = RunnableLambda(print_prompt)
-
-        prompt = self.get_custom_prompt()
         embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        db = FAISS.load_local(get_absolute_path("vectorstore/db_faiss"), embeddings)
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-pro", temperature=0.5, convert_system_message_to_human=True
+        self.db = FAISS.load_local(
+            get_absolute_path("vectorstore/db_faiss"), embeddings
         )
 
-        # TODO: incremental summary
-        contextualize_q_system_prompt = """"""
-        contextualize_q_prompt = ChatPromptTemplate.from_messages(
-            [
-                SystemMessage(content=contextualize_q_system_prompt),
-                MessagesPlaceholder(variable_name="history"),
-                HumanMessage(content="Summarise the previous chat. include as much detail as much details in fewest words possible such that it is easy for LLMs to understand and use for context."),
-            ]
+    def retrival_qa_chain(self, model: Model):
+        if model == Model.gemini_pro:
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-pro",
+                temperature=0.5,
+                convert_system_message_to_human=True,
+            )
+        elif model == Model.llama2:
+            llm = Ollama(model=Model.llama2.value + ":vram-34")
+        else:
+            raise RuntimeError("unknown llm")
+
+        summarization_chain = (
+            RunnableLambda(
+                lambda x: PromptTemplate(
+                    template=summarization_prompt_template.invoke(x).to_string(),
+                    input_variables=[],
+                ).invoke({})
+            )
+            | llm
+            | StrOutputParser()
         )
-        contextualize_q_chain = (
-            contextualize_q_prompt | printer | llm | printer | StrOutputParser()
-        )
-        # print(contextualize_q_prompt.format(chat_history = [HumanMessage(content="What does LLM stand for?"),
-        #          AIMessage(content="Large language model"),], question="fsfdf" ))
-        # contextualize_q_chain.invoke({"history": [HumanMessage(content="What does LLM stand for?"),
-        #          AIMessage(content="Large language model"),]})
 
         def get_summary(x):
+            def get_history_object(mesg):
+                if mesg.role == MessageRole.assistant:
+                    return AIMessage(mesg.content)
+                else:
+                    return HumanMessage(mesg.content)
+
             history = x["history"]
+
             if len(history) > 1:
-                return contextualize_q_chain.invoke({"history": history})
+                return summarization_chain.invoke(
+                    {"history": list(map(get_history_object, history))}
+                )
             else:
                 return "None"
 
         return (
             RunnableParallel(
                 question=lambda x: x["question"],
-                # context=lambda x: db.as_retriever().invoke(x["question"]),
                 summary=get_summary,
             )
+            | printer
             | RunnableParallel(
-                question= lambda x: x['question'],
-                summary= lambda x: x['summary'],
-                context=lambda x: db.as_retriever().invoke(x['summary'] + x['question']),
-            )
-            | RunnableParallel(
-                llm_inputs=prompt,
-                context=lambda x: x['context'],
-            )
-            | RunnableParallel(
-                response=lambda x: (llm | StrOutputParser()).invoke(x["llm_inputs"]),
-                context=lambda x: x['context'],
+                question=(
+                    question_rephrase_prompt_template | llm | StrOutputParser()
+                ),
             )
             | printer
+            | RunnableParallel(
+                question=lambda x: x['question'],
+                context=lambda x: self.db.as_retriever().invoke(x["question"]),
+            )
+            | printer
+            | RunnableParallel(
+                response=(chatbot_promt_template | llm | StrOutputParser()),
+                context=lambda x: x["context"],
+            )
         )
 
-    def get_response(self, question, history: List[MessageListItem] = []):
-        def get_history_object(mesg):
-            if mesg.role == MessageRole.assistant:
-                return AIMessage(mesg.content)
-            else:
-                return HumanMessage(mesg.content)
-
-        bot = self.retrival_qa_chain()
-        response = bot.invoke(
-            {"question": question, "history": list(map(get_history_object, history))}
-        )
+    def get_response(self, question, model, history: List[MessageListItem] = []):
+        bot = self.retrival_qa_chain(model)
+        response = bot.invoke({"question": question, "history": history})
         return response
-

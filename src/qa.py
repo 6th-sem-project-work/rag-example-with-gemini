@@ -90,17 +90,23 @@ class QaService:
             get_absolute_path("vectorstore/db_faiss"), embeddings
         )
 
-    def retrival_qa_chain(self, model: Model):
+    def get_model(self, model: Model, temperature=0.5):
         if model == Model.gemini_pro:
             llm = ChatGoogleGenerativeAI(
                 model="gemini-pro",
-                temperature=0.5,
+                temperature=temperature,
                 convert_system_message_to_human=True,
             )
         elif model == Model.llama2 or model == Model.llama2_uncensored:
-            llm = Ollama(model=model.value + ":vram-34")
+            llm = Ollama(model=model.value + ":vram-34", temperature=temperature)
         else:
             raise RuntimeError("unknown llm")
+
+        return llm
+
+    def retrival_qa_chain(self, model: Model):
+        boring_llm = self.get_model(model, 0)
+        smart_llm = self.get_model(model, 0.4)
 
         summarization_chain = (
             RunnableLambda(
@@ -109,7 +115,7 @@ class QaService:
                     input_variables=[],
                 ).invoke({})
             )
-            | llm
+            | boring_llm
             | StrOutputParser()
         )
 
@@ -137,7 +143,7 @@ class QaService:
             | printer
             | RunnableParallel(
                 question=(
-                    question_rephrase_prompt_template | llm | StrOutputParser()
+                    question_rephrase_prompt_template | boring_llm | StrOutputParser()
                 ),
             )
             | printer
@@ -147,7 +153,7 @@ class QaService:
             )
             | printer
             | RunnableParallel(
-                response=(chatbot_promt_template | llm | StrOutputParser()),
+                response=(chatbot_promt_template | smart_llm | StrOutputParser()),
                 context=lambda x: x["context"],
             )
         )

@@ -97,8 +97,8 @@ class QaService:
                 temperature=0.5,
                 convert_system_message_to_human=True,
             )
-        elif model == Model.llama2:
-            llm = Ollama(model=Model.llama2.value + ":vram-34")
+        elif model == Model.llama2 or model == Model.llama2_uncensored:
+            llm = Ollama(model=model.value + ":vram-34")
         else:
             raise RuntimeError("unknown llm")
 

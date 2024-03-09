@@ -9,6 +9,7 @@ class MessageRole(str, enum.Enum):
 class Model(str, enum.Enum):
     gemini_pro = "gemini-pro"
     llama2 = "llama2"
+    llama2_uncensored = "llama2-uncensored"
 
 class Message(pydantic.BaseModel):
     client_id: str

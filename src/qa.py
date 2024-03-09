@@ -55,21 +55,21 @@ summarization_prompt_template = ChatPromptTemplate.from_messages(
     [
         MessagesPlaceholder(variable_name="history"),
         SystemMessage(
-            content="Summarise the previous chat. include as much detail as much details in fewest words possible such that it is easy for LLMs to understand and use for context."
+            content="Summarise the chat. include as much detail as much details in the least words possible such that it is easy to understand the context."
         ),
     ]
 )
 
 question_rephrase_prompt = """
-Summary: {summary}
+System: you are an AI. your job is to rephrase the question given below with given context (if required) such that it is possible to answer it without any context. do not change the meaning of question. write the question as if it was written by the user. DO NOT answer the question. just rephrase it.
 
+Context: user and ai are talking about mountains.
+Question: what is it?
+Rephrased Question: What is a mountain?
+
+Context: {summary}
 Question: {question}
-
-System: given a summary of chat between an assistant and a person, rephrase the question with any context that might make sense to include. make the question self sufficient such that it is possible to answer it without providing any more context. Note: write the question as if it was written by the user and nothing else in the output.
-
-Example Question: i am having a headache. what should i do?
-
-Question: 
+Rephrased Question: 
 """
 question_rephrase_prompt_template = PromptTemplate(
     template=question_rephrase_prompt, input_variables=["summary", "question"]
@@ -82,20 +82,13 @@ def printer_print(x):
     return x
 printer = RunnableLambda(printer_print)
 
-
 class QaService:
-    def __init__(self):
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        self.db = FAISS.load_local(
-            get_absolute_path("vectorstore/db_faiss"), embeddings
-        )
-
     def get_model(self, model: Model, temperature=0.5):
         if model == Model.gemini_pro:
             llm = ChatGoogleGenerativeAI(
                 model="gemini-pro",
-                temperature=temperature,
                 convert_system_message_to_human=True,
+                temperature=temperature,
             )
         elif model == Model.llama2 or model == Model.llama2_uncensored:
             llm = Ollama(model=model.value + ":vram-34", temperature=temperature)
@@ -104,9 +97,15 @@ class QaService:
 
         return llm
 
-    def retrival_qa_chain(self, model: Model):
-        boring_llm = self.get_model(model, 0)
-        smart_llm = self.get_model(model, 0.4)
+class VectorDbQaService(QaService):
+    def __init__(self):
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        self.db = FAISS.load_local(
+            get_absolute_path("vectorstore/db_faiss"), embeddings
+        )
+
+    def qa_chain(self, model: Model):
+        llm = self.get_model(model, 0)
 
         summarization_chain = (
             RunnableLambda(
@@ -115,7 +114,7 @@ class QaService:
                     input_variables=[],
                 ).invoke({})
             )
-            | boring_llm
+            | llm
             | StrOutputParser()
         )
 
@@ -143,7 +142,7 @@ class QaService:
             | printer
             | RunnableParallel(
                 question=(
-                    question_rephrase_prompt_template | boring_llm | StrOutputParser()
+                    question_rephrase_prompt_template | llm | StrOutputParser()
                 ),
             )
             | printer
@@ -153,12 +152,12 @@ class QaService:
             )
             | printer
             | RunnableParallel(
-                response=(chatbot_promt_template | smart_llm | StrOutputParser()),
+                response=(chatbot_promt_template | llm | StrOutputParser()),
                 context=lambda x: x["context"],
             )
         )
 
-    def get_response(self, question, model, history: List[MessageListItem] = []):
-        bot = self.retrival_qa_chain(model)
+    def get_response(self, question: str, model: Model, history: List[MessageListItem] = []):
+        bot = self.qa_chain(model)
         response = bot.invoke({"question": question, "history": history})
         return response

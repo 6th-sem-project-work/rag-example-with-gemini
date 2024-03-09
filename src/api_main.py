@@ -6,7 +6,7 @@ import qa
 
 rc = redis.Redis(host="localhost", port=6379, decode_responses=True)
 app = FastAPI()
-chain = qa.QaService()
+chain = qa.VectorDbQaService()
 
 
 @app.get("/mesg_history/get/{client_id}")

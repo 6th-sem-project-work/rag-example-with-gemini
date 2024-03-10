@@ -31,6 +31,8 @@
         profile = ''
           source ./.venv/bin/activate
           source .env
+          export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+          export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
         '';
       };
       pip-install = pkgs.buildFHSEnv {
@@ -75,6 +77,7 @@
       packages = pkgs: (with pkgs; [
         (pkgs.python310.withPackages (ps:
           with ps; [
+            playwright
           ]))
         python311Packages.python-lsp-server
         python311Packages.ruff-lsp # python linter
@@ -85,6 +88,7 @@
         zlib # idk why/if this is needed
 
         redis
+        playwright-driver.browsers
 
         # virtualenv .venv
         # source ./.venv/bin/activate
@@ -96,6 +100,8 @@
         nativeBuildInputs = [fhs] ++ custom-commands ++ packages pkgs;
         shellHook = ''
           source .env
+          export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+          export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
         '';
       };
       # devShells.default = fhs.env;

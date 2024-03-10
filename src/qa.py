@@ -112,6 +112,18 @@ search_query_prompt_template = PromptTemplate(
     template=search_query_prompt, input_variables=["summary", "question"]
 )
 
+generic_chatbot_prompt = """
+Context: {context}
+
+Question: {question}
+
+System: you are a helpful and smart AI chatbot. provided the context and a question, answer it using the given context. do not deviate from the given context. give detailed and helpful answers.
+
+AI:
+"""
+generic_chatbot_promt_template = PromptTemplate(
+    template=generic_chatbot_prompt, input_variables=["context", "question"]
+)
 
 def printer_print(x):
     print()
@@ -371,7 +383,7 @@ class InternetQaService(QaService):
         )
 
     def qa_chain(self, model: Model):
-        llm = self.get_model(model, 0)
+        llm = self.get_model(model)
         embeddings = self.get_embeddings(model)
 
         return (
@@ -396,7 +408,7 @@ class InternetQaService(QaService):
                 context=self.web_context_chain(llm, embeddings),
             )
             | printer
-            | chatbot_promt_template
+            | generic_chatbot_promt_template
             | printer
             | llm
             | StrOutputParser()
